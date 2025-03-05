@@ -107,6 +107,32 @@ class dirtFindingProblem:
         return gridutil.manhatDist(state[0], state[2])
     """
     
+class routeFindingProblem:
+    
+    def __init__(self, start, target, ori, furn, n):
+        self.initial_state = (start, ori, target)
+        self.furn = furn
+        self.size = n
+        self.cost = {"turnleft": 20, "turnright": 20, "forward": 20}
+        
+        
+    def successors(self, state):
+        loc, ori, target = state
+        loc1 = gridutil.nextLoc(loc, ori)
+        if gridutil.legalLoc(loc1, self.size) and (loc not in self.furn):
+            yield("forward", (loc1, ori, target))
+        yield("turnleft", (loc, gridutil.leftTurn(ori), target))
+        yield("turnright", (loc, gridutil.rightTurn(ori), target))
+        
+    
+    def goal_test(self, state):
+        return state[0] == state[2]
+
+    def h(self, state):
+        return gridutil.manhatDist(state[0], state[2])
+    
+
+    
 
 def findClosestDirt(agentLoc, dirt):
     closest = math.inf
