@@ -36,8 +36,8 @@ class VacAgent:
             #make new route
             d = findClosestDirt(location, dirt)
                 
-            prob = dirtFindingProblem(location, d, orientation, furniture, self.size)
-            result = search.astar_search(prob)
+            prob = dirtFindingProblem(location, dirt, orientation, furniture, self.size)
+            result = search.bf_graph_search(prob)
             self.route = result.extract_plan()
             
 
@@ -71,10 +71,10 @@ class VacAgent:
                         break
                 target = newTarget
 
-            prob = dirtFindingProblem(location, target, orientation, furniture, self.size)
+            prob = routeFindingProblem(location, target, orientation, furniture, self.size)
         else:
             #close enough to home that direct search is possible
-            prob = dirtFindingProblem(location, (0,0), orientation, furniture, self.size)
+            prob = routeFindingProblem(location, (0,0), orientation, furniture, self.size)
         result = search.astar_search(prob)  #note astar search
         self.route = result.extract_plan()
         #add poweroff so bot doesn't go in circles
@@ -102,7 +102,7 @@ class dirtFindingProblem:
     def goal_test(self, state):
         return state[0] in self.dirt
 
-    """#added a hueristic
+    """
     def h(self, state):
         return gridutil.manhatDist(state[0], state[2])
     """
