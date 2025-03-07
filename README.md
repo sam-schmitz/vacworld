@@ -3,6 +3,10 @@
 <p>Status: Complete</p>
 <h4>Description:</h4>
 <p>Andrew Poock and I created multiple AI agents that navigated the world of an autonomous vacum for our class CS 373(Artificial Intelligence). These agents traversed a pseudo-random environment filled with furniture to suck up all the dirt tiles and return home. Points were awarded based on time and completeness. The agent Jimmy was able to place third in the class. </p>
+<p>
+  <b>To run: </b>python3 runsim.py <i>agent name</i> <br />
+  <b>Options: </b>-s <i>number</i> changes the size
+</p>
 <h2>Project Elements:</h2>
 <ul>
   <li>
