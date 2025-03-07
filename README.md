@@ -21,6 +21,11 @@
     <p><b>Location: </b>agents/barry.py</p>
   </li>
   <li>
+    <h4>Willy</h4>
+    <p><b>Description: </b>Folllows the same idea of Billy but instead searches for shortest path to a dirt (instead of a path to the nearest dirt). </p>
+    <p><b>Location: </b>agents/willy.py</p>
+  </li>
+  <li>
     <h4>Search</h4>
     <p><b>Description: </b>Different algorithms for solving search problems. We created this in a previous part of the course. Algorithms include depth-first search, breadth-first search, iterative deepening search, and a star search. Cycle prevention is also avaliable for the depth-first based searches. </p>
     <p><b>Location: </b>search.py</p>
