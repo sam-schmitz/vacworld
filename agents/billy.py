@@ -1,8 +1,6 @@
 # billy.py
 # By: Sam Schmitz & Andrew Poock
 
-import random
-import time
 import gridutil
 import math
 import search
