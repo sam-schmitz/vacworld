@@ -10,12 +10,17 @@
 <h2>Project Elements:</h2>
 <ul>
   <li>
+    <h4>Bobby 3</h4>
+    <p><b>Description: </b>Bobby 3 uses a Nueral Net (Keras, more info in its own section) to create a path through the course. He was trained on data gathered from ripper in order to beat him. The agent creates 15 different paths and uses the shortest one. </p>
+    <p><b>Location: </b>agents/bobby3.py</p>
+    </li>
+  <li>
     <h4>Billy</h4>
     <p><b>Description: </b>Billy used a iterative deepening a star search to find a path to the closest dirt and suck it up. He also had a go home algorithm which had him search for tiles on a path home to shorten the search distance. </p>
     <p><b>Location: </b>agents/billy.py</p>
   </li>
   <li>
-    <h4>Billy</h4>
+    <h4>Jimmy</h4>
     <p><b>Description: </b>Added to Billy by dividing the search area up into rows. This agent was able to perform more efficiently on larger enviornments. </p>
     <p><b>Location: </b>agents/jimmy.py</p>
   </li>
@@ -33,5 +38,15 @@
     <h4>Search</h4>
     <p><b>Description: </b>Different algorithms for solving search problems. We created this in a previous part of the course. Algorithms include depth-first search, breadth-first search, iterative deepening search, and a star search. Cycle prevention is also avaliable for the depth-first based searches. </p>
     <p><b>Location: </b>search.py</p>
+  </li>
+  <li>
+    <h4>Bobby3 Keras</h4>
+    <p><b>Description: </b>A convolutional Nueral Net trained to beat the ripper. The convolutional net takes an encoded vacworld enviornment as its input and outputs an action for an agent. The Net is structured with a 2 conv2D layers (128 and 256 layers) and a dense layer (512). Bobby 3 was trained with reinforcement learning to attempt to beat ripper. </p>
+    <p><b>Location: </b>agents/bobby3.keras</p>
+  </li>
+  <li>
+    <h4>Reinforcement Learning</h4>
+    <p><b>Description: </b>Performs reinforcement learning on a keras model (set to bobby3 currently). Trains the model on the best path created by either the current net or ripper. </p>
+    <p><b>Location: </b>reinforcement_learning.py</p>
   </li>
 </ul>
