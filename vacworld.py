@@ -8,21 +8,28 @@
 #
 #   See the bottom of the file for help in running your agent
 
-
+import sys
+import os
 import random
 import time
 import pickle
+import threading
 from multiprocessing import Process, Queue
 from queue import Empty
 
 import graphics as gr
 import gridutil as gu
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "5"  # Turn off TF chatter
+os.environ["CUDA_VISIBLE_DEVICES"] = ""   # Turn off GPU usage
+
+
+dashes = "------------------------------"
 
 class VacWorldEnv:
     """
     Scoring:
-    
+
         Each action costs: 20 point
         Reward per cell cleaned: 100
         Penalty for bumping walls or furniture: 100
@@ -40,8 +47,13 @@ class VacWorldEnv:
         self.size = size
         self.reset()
 
-    def reset(self):
+    def reset(self, randomstart=False):
         self.restorePercept(self.init_percept)
+        if randomstart:
+            locations = [(x, y) for x in range(self.size) for y in range(self.size)
+                         if (x, y) in self.reachable]
+            self.agentLoc = random.choice(locations)
+            self.agentDir = random.choice("NESW")
 
     def restorePercept(self, p):
         loc, orient, dirt, furn = p
@@ -103,38 +115,51 @@ class VacView:
                  'S': (0, VacSize, 0, -VacSize),
                  'W': (VacSize, 0, -VacSize, 0)}
 
-    color = "orange"
-
+    color = "#EE7C00"
+    # color = "red1"
+    
     def __init__(self, state, height=800, title="Vacuum World", panel=False):
-        xySize = state.size
-        aspect = 1.33 if panel else 1.0
+        self.aspect = aspect = 1.33 if panel else 1.0
         win = gr.GraphWin(title, aspect*height, height, autoflush=False)
         self.win = win
-        win.setCoords(-.5, -.5, aspect*xySize-.5, xySize-.5)
-        win.setBackground("gray99")
+        win.setCoords(0, 0, aspect*100, 100)
+        win.setBackground("azure")
 
-        cells = self.cells = {}
-        for x in range(xySize):
-            for y in range(xySize):
-                cells[(x, y)] = gr.Rectangle(gr.Point(x-.5, y-.5),
-                                             gr.Point(x+.5, y+.5))
-                cells[(x, y)].setWidth(2)
-                cells[(x, y)].draw(win)
+        self.cells = None
+        self.configureCells(state.size)
+
         self.vac = None
-        ccenter = 1.167*(xySize-.5)
-        self.time = gr.Text(gr.Point(ccenter, (xySize-1)*.75), "Time").draw(win)
+        ccenter = 116.7
+        self.time = gr.Text(gr.Point(ccenter, 75), "Time").draw(win)
         self.time.setSize(36)
         self.setTimeColor("black")
 
-        self.agentName = gr.Text(gr.Point(ccenter, (xySize-1)*.5), "").draw(win)
+        self.agentName = gr.Text(gr.Point(ccenter, 50), "").draw(win)
         self.agentName.setSize(20)
-        self.agentName.setFill("Orange")
+        self.agentName.setFill(self.color)
 
-        self.info = gr.Text(gr.Point(ccenter, (xySize-1)*.25), "").draw(win)
+        self.info = gr.Text(gr.Point(ccenter, 25), "").draw(win)
         self.info.setSize(20)
         self.info.setFace("courier")
 
         self.update(state)
+
+    def configureCells(self, xySize):
+        self.xySize = xySize
+        self.cellSize = 100/xySize
+        if self.cells:
+            for cell in self.cells.values():
+                cell.undraw()
+        csize = self.cellSize
+        cells = {}
+        for x in range(xySize):
+            for y in range(xySize):
+                cells[(x, y)] = gr.Rectangle(gr.Point(x*csize, y*csize),
+                                             gr.Point((x+1)*csize, (y+1)*csize)
+                                             )
+                cells[(x, y)].setWidth(2)
+                cells[(x, y)].draw(self.win)
+        self.cells = cells
 
     def setAgent(self, name):
         self.agentName.setText(name)
@@ -146,7 +171,11 @@ class VacView:
         self.info.setText(info)
 
     def update(self, state):
-        # View state in exiting window
+        # View state in existing window
+        if state.size != self.xySize:
+            # this env has new size, redraw grid
+            self.configureCells(state.size)
+            
         for loc, cell in self.cells.items():
             if loc in state.dirt:
                 cell.setFill("lightgray")
@@ -160,8 +189,9 @@ class VacView:
 
         x, y = state.agentLoc
         dx0, dy0, dx1, dy1 = self.VacPoints[state.agentDir]
-        p1 = gr.Point(x+dx0, y+dy0)
-        p2 = gr.Point(x+dx1, y+dy1)
+        csize = self.cellSize
+        p1 = gr.Point((x+.5+dx0)*csize, (y+.5+dy0)*csize)
+        p2 = gr.Point((x+.5+dx1)*csize, (y+.5+dy1)*csize)
         vac = gr.Line(p1, p2)
         vac.setWidth(5)
         vac.setArrow('last')
@@ -207,8 +237,48 @@ class ProcAgent:
             action = None
         return action
 
+    def is_alive(self):
+        return self.process.is_alive()
+
     def quit(self):
         self.process.terminate()
+
+
+# ----------------------------------------------------------------------
+class ThreadAgent:
+
+    class RequestThread(threading.Thread):
+
+        def __init__(self, agt, percept):
+            self.agt = agt
+            self.percept = percept
+            self.action = None
+            threading.Thread.__init__(self)
+
+        def run(self):
+            self.action = self.agt(self.percept)
+            sys.stdout.flush()
+
+    def __init__(self, agent):
+        self.agent = agent
+
+    def requestAction(self, percept):
+        self.thread = self.RequestThread(self.agent, percept)
+        self.thread.start()
+
+    def getAction(self):
+        if self.thread.is_alive():
+            return None
+        else:
+            action = self.thread.action
+            self.thread = None
+            return action
+
+    def is_alive(self):
+        return self.thread is not None
+
+    def quit(self):
+        pass
 
 
 # ----------------------------------------------------------------------
@@ -216,10 +286,11 @@ class TimedSimulation:
 
     infostr = "{:}\n\n\n Count: {:<7d}\n\n Score: {:<7d} "
 
-    def __init__(self, env, timelimit, win=None):
+    def __init__(self, env, timelimit, win=None, use_thread=True):
         self.env = env
         self.limit = timelimit
-        self.win = win or VacView(env, height=600, panel=True)
+        self.win = win or VacView(env, height=1000, panel=True)
+        self.use_thread = use_thread
         self.reset()
 
     def reset(self):
@@ -228,6 +299,7 @@ class TimedSimulation:
         self.actioncount = 0
         self.score = 0
         self.lastaction = None
+        self.win.setTimeColor("Black")
         self.updateAnimationView()
 
     def updateAnimationView(self):
@@ -240,7 +312,9 @@ class TimedSimulation:
                                              self.score))
 
     def start(self):
-        self.win.pause()
+        input("Press <Enter> to start run ")
+        #print("Click to start...")
+        # self.win.pause()
         self.win.setTimeColor("green")
         self.starttime = time.time()
 
@@ -252,22 +326,26 @@ class TimedSimulation:
         time_bonus = int(max(self.limit - self.elapsed+1, 0))
         self.score = self.score + time_bonus
         self.updateInfoView()
-        self.win.pause()
-        self.win.close()        
-        print("--------------------------------------------")
+        #self.win.pause()
+        #self.win.close()
+        print(dashes)
         print("Actions done:", self.actioncount)
         print("Think time:", max(round(self.elapsed-self.actioncount/15, 1), 0.0))
         print("Time Bonus:", time_bonus)
         print("Final score:", self.score)
 
     def run(self, agent, agtName):
-        agent = ProcAgent(agent)
+        print(dashes)
+        agent = ProcAgent(agent) if not self.use_thread else ThreadAgent(agent)
         self.win.setAgent(agtName.upper())
         self.reset()
         self.updateInfoView()
         self.start()
         agent.requestAction(self.env.getPercept())
         while self.env.running:
+            if not agent.is_alive():
+                self.elapsed = self.limit+.1
+                break
             if self.elapsed >= self.limit:
                 # pull the plug
                 action = "poweroff"
@@ -282,11 +360,13 @@ class TimedSimulation:
                 self.lastaction = action
                 self.updateAnimationView()
             gr.update(15)
-            self.elapsed = time.time() - self.starttime
+            if self.elapsed < self.limit:
+                self.elapsed = time.time() - self.starttime
             self.updateInfoView()
         agent.quit()
         self.updateInfoView()
         self.finish()
+        return self.score
 
 
 # ----------------------------------------------------------------------
@@ -314,7 +394,9 @@ def randomEnv(size=4, dprob=.3, fprob=.15):
                 frontier.append(neighbor)
 
     dirt = [loc for loc in reachable if random.random() < dprob]
-    return VacWorldEnv(size, dirt, furn)
+    env = VacWorldEnv(size, dirt, furn)
+    env.reachable = reachable
+    return env
 
 
 def loadEnv(fname, basedir="./envs/"):
@@ -324,7 +406,7 @@ def loadEnv(fname, basedir="./envs/"):
     return env
 
 
-def quickSim(agentname, env, timelimit=120, report=True, trace=False):
+def quickSim(agt, env,  timelimit=120, report=True, trace=False):
     """Run a quick simulation
 
         Does not expend time executing actions so a simulation can be
@@ -333,7 +415,8 @@ def quickSim(agentname, env, timelimit=120, report=True, trace=False):
         farily accurate.
 
     """
-    agt = loadAgent(agentname, env.size, timelimit)
+    if type(agt) == str:
+        agt = loadAgent(agt, env.size, timelimit)
     env.reset()
     score = 0
     step = 1
@@ -354,7 +437,7 @@ def quickSim(agentname, env, timelimit=120, report=True, trace=False):
     bonus = int(timelimit - elapsed - (step-1)/15 + 1)
     score = score + bonus
     if report:
-        print("--------------------------------------------")
+        print(dashes)
         print("elapsed time:", round(elapsed, 2))
         print("steps:", step-1)
         print("time bonus", bonus)
@@ -375,11 +458,13 @@ def loadAgent(modname, n, timelimit):
     return agent
 
 
-def test(agtname, agent=None, env=None, size=10, timelimit=120):
+def test(agent, agtname="test", env=None, size=10, timelimit=120):
     """perform a simulation with the given agent or load from module agtname
 
     """
     env = env or randomEnv(size)
-    sim = TimedSimulation(env, timelimit)
-    agent = agent or loadAgent(agtname, env.size, timelimit)
+    sim = TimedSimulation(env, timelimit, )
+    if type(agent) == str:
+        agtname = agent
+        agent = loadAgent(agent, env.size, timelimit)
     sim.run(agent, agtname)
